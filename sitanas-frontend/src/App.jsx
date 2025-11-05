@@ -2,44 +2,37 @@
 import { Routes, Route } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
-import Layout from './components/layout/Layout'; // 1. Impor Layout
-import ProtectedRoute from './components/common/ProtectedRoute'; // 2. Impor Penjaga
-
-// Buat halaman dummy lainnya untuk tes link
-const LaporanPage = () => <h2>Halaman Laporan (WIP)</h2>;
-const ManajemenPenggunaPage = () => <h2>Halaman Manajemen Pengguna (WIP)</h2>;
-const LogsPage = () => <h2>Halaman Log Aktivitas (WIP)</h2>;
+import Layout from './components/layout/Layout';
+import ProtectedRoute from './components/common/ProtectedRoute';
+// KOREKSI PATH: Menggunakan path relatif yang benar dari root 'src'
+import ManajemenPenggunaPage from './pages/ManajemenPenggunaPage'; 
+import LaporanPage from './pages/LaporanPage'; // <-- Tambahkan jika belum ada
+import LogsPage from './pages/LogsPage'; // <-- Tambahkan jika belum ada
 
 function App() {
   return (
     <Routes>
-      {/* Rute Publik: Halaman Login */}
-      <Route path="/login" element={<LoginPage />} />
+      {/* Rute Publik */}
       <Route path="/" element={<LoginPage />} />
+      <Route path="/login" element={<LoginPage />} />
 
-      {/* Grup Rute Terlindungi (Protected Routes) 
-        Semua rute di dalam sini akan:
-        1. Dilindungi oleh <ProtectedRoute>
-        2. Ditampilkan di dalam <Layout> (Sidebar + Topbar)
-      */}
-      <Route
-        path="/" // Ini adalah "induk" untuk rute di dalamnya
-        element={
-          <ProtectedRoute>
-            <Layout />
-          </ProtectedRoute>
-        }
-      >
-        {/* Rute di bawah ini adalah 'children' dari Layout */}
+      {/* Grup Rute Terlindungi */}
+      <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+        {/* Rute Aset */}
         <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="laporan" element={<LaporanPage />} />
-        <Route path="manajemen-pengguna" element={<ManajemenPenggunaPage />} />
-        <Route path="logs" element={<LogsPage />} />
         
-        {/* Nanti kita akan tambahkan rute lain seperti /tanah/detail/:id */}
-      </Route>
+        {/* Rute Laporan & Log */}
+        <Route path="laporan" element={<LaporanPage />} />
+        <Route path="logs" element={<LogsPage />} />
 
-      {/* Rute 404 (Halaman Tidak Ditemukan) */}
+        {/* Rute Manajemen Pengguna */}
+        <Route path="manajemen-pengguna" element={<ManajemenPenggunaPage />} />
+        
+        {/* Rute Tambahan (Isi dengan halaman baru lainnya) */}
+
+      </Route>
+      
+      {/* Rute 404 */}
       <Route path="*" element={<h2>404: Halaman Tidak Ditemukan</h2>} />
     </Routes>
   );

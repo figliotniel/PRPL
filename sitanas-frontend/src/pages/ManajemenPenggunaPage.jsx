@@ -2,44 +2,35 @@ import React, { useState, useEffect } from 'react';
 import { getUsers, createUser, deleteUser, getRoles } from '../services/userService';
 import { generateStrongPassword } from '../utils/passwordGenerator';
 import { useAuth } from '../hooks/useAuth';
-import '../../assets/Layout.css'; 
+import AddUserModal from '../components/common/AddUserModal'; // <-- Import komponen Modal yang baru
+import '../assets/Layout.css'; 
+// import '../assets/style.css'; // Pastikan diimpor jika tidak di Layout.css
 
-// Component Modal akan kita buat di langkah berikutnya, untuk sementara pakai div
-const DummyModal = ({ children, onClose }) => (
-    <div style={{
-        position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', 
-        backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
-    }}>
-        <div className="card" style={{ width: '400px', padding: '20px' }}>
-            <div className="card-header">
-                <h4>Tambah Pengguna</h4>
-                <button className="btn btn-danger btn-sm" onClick={onClose}>X</button>
-            </div>
-            <div className="card-body">{children}</div>
-        </div>
-    </div>
-);
 
+// State awal form
+const initialFormState = { 
+    nama_lengkap: '', 
+    email: '', 
+    password: '', 
+    password_confirmation: '', 
+    role_id: '' 
+};
 
 function ManajemenPenggunaPage() {
     const { user } = useAuth();
+    
     const [users, setUsers] = useState([]);
     const [roles, setRoles] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    
     const [showModal, setShowModal] = useState(false);
-    const [form, setForm] = useState({ 
-        nama_lengkap: '', 
-        email: '', 
-        password: '', 
-        password_confirmation: '', 
-        role_id: '' 
-    });
+    const [form, setForm] = useState(initialFormState);
     const [formError, setFormError] = useState(null);
 
     // Fetch data utama
     const fetchUsersAndRoles = async () => {
-        if (user?.role_id !== 1) return; // Hanya Admin
+        if (user?.role_id !== 1) return; 
         try {
             setLoading(true);
             const [usersResponse, rolesResponse] = await Promise.all([
@@ -49,15 +40,20 @@ function ManajemenPenggunaPage() {
             setUsers(usersResponse);
             setRoles(rolesResponse);
         } catch (err) {
-            setError("Gagal memuat data pengguna.");
+            // Cek jika error 403 (Akses Ditolak), tampilkan pesan yang spesifik
+            const errorMessage = err.response?.status === 403 
+                                ? "Akses ditolak. Anda tidak memiliki izin untuk melihat data ini."
+                                : "Gagal memuat data pengguna.";
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }
     };
 
+    // FIX: Tambahkan dependency array user.id agar fetch terjadi setelah login berhasil
     useEffect(() => {
         fetchUsersAndRoles();
-    }, [user]);
+    }, [user?.id]); // Hanya panggil saat user ID berubah (login berhasil)
 
     const handleChange = (e) => {
         setForm({ ...form, [e.target.name]: e.target.value });
@@ -75,19 +71,23 @@ function ManajemenPenggunaPage() {
             await createUser(form);
             alert("Pengguna berhasil ditambahkan!");
             setShowModal(false);
-            setForm({ nama_lengkap: '', email: '', password: '', password_confirmation: '', role_id: '' });
+            setForm(initialFormState); // Reset form
             fetchUsersAndRoles(); // Refresh data
         } catch (err) {
-            setFormError(err.response?.data?.message || "Gagal membuat pengguna. Periksa input.");
+             // Tangani error validasi (cth: email sudah dipakai)
+            const validationMessage = err.response?.data?.errors 
+                                      ? Object.values(err.response.data.errors).flat().join('; ')
+                                      : err.response?.data?.message || "Gagal membuat pengguna. Periksa input.";
+            setFormError(validationMessage);
         }
     };
     
     const handleDelete = async (id, nama) => {
-        if (window.confirm(`Yakin ingin menonaktifkan pengguna ${nama}?`)) {
+        if (window.confirm(`Yakin ingin menonaktifkan pengguna ${nama}? Tindakan ini bersifat permanen.`)) {
             try {
                 await deleteUser(id);
                 alert(`${nama} berhasil dinonaktifkan.`);
-                fetchUsersAndRoles(); // Refresh
+                fetchUsersAndRoles(); 
             } catch (err) {
                 setError("Gagal menonaktifkan pengguna.");
             }
@@ -104,7 +104,7 @@ function ManajemenPenggunaPage() {
         <div>
             <div className="content-header">
                 <h1>Manajemen Pengguna</h1>
-                <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+                <button className="btn btn-primary" onClick={() => {setShowModal(true); setForm(initialFormState); setFormError(null);}}>
                     <i className="fas fa-user-plus"></i> Tambah Pengguna
                 </button>
             </div>
@@ -112,7 +112,7 @@ function ManajemenPenggunaPage() {
             {error && <div className="notification error">{error}</div>}
 
             <div className="card">
-                <div className="card-header"><h4>Daftar Aparatur Desa</h4></div>
+                <div className="card-header"><h4>Daftar Aparatur Desa ({users.length} data)</h4></div>
                 <div className="card-body">
                     <div className="table-responsive">
                         <table>
@@ -143,6 +143,10 @@ function ManajemenPenggunaPage() {
                                                         <i className="fas fa-user-slash"></i>
                                                     </button>
                                                 )}
+                                                {/* Tombol aktifkan kembali jika diperlukan */}
+                                                {u.deleted_at && (
+                                                    <button className="btn btn-sm btn-success" title="Aktifkan Kembali"><i className="fas fa-redo"></i></button>
+                                                )}
                                             </td>
                                         </tr>
                                     ))
@@ -157,35 +161,15 @@ function ManajemenPenggunaPage() {
 
             {/* Modal Tambah Pengguna */}
             {showModal && (
-                <DummyModal onClose={() => setShowModal(false)}>
-                    <form onSubmit={handleSubmit}>
-                        {formError && <div className="notification error">{formError}</div>}
-                        
-                        <div className="form-group"><label>Nama Lengkap</label><input type="text" name="nama_lengkap" className="form-control" value={form.nama_lengkap} onChange={handleChange} required /></div>
-                        <div className="form-group"><label>Email</label><input type="email" name="email" className="form-control" value={form.email} onChange={handleChange} required /></div>
-                        
-                        <div className="form-group">
-                            <label>Peran</label>
-                            <select name="role_id" className="form-control" value={form.role_id} onChange={handleChange} required>
-                                <option value="">-- Pilih Peran --</option>
-                                {roles.map(r => (
-                                    <option key={r.id} value={r.id}>{r.nama_role}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="form-group">
-                            <label>Password</label>
-                            <div style={{display: 'flex', gap: '10px'}}>
-                                <input type="text" name="password" className="form-control" value={form.password} onChange={handleChange} required />
-                                <button type="button" className="btn btn-secondary btn-sm" onClick={handleGeneratePassword} style={{minWidth: '150px'}}><i className="fas fa-key"></i> Generate</button>
-                            </div>
-                        </div>
-                        <div className="form-group"><label>Konfirmasi Password</label><input type="text" name="password_confirmation" className="form-control" value={form.password_confirmation} onChange={handleChange} required /></div>
-
-                        <button type="submit" className="btn btn-primary btn-block">Simpan Pengguna</button>
-                    </form>
-                </DummyModal>
+                <AddUserModal
+                    onClose={() => setShowModal(false)}
+                    roles={roles}
+                    form={form}
+                    handleChange={handleChange}
+                    handleSubmit={handleSubmit}
+                    formError={formError}
+                    handleGeneratePassword={handleGeneratePassword}
+                />
             )}
         </div>
     );
